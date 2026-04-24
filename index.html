@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>항공기 실시간 성능 계산기 (IGE/OGE 자동환산)</title>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f4f4f4; padding: 20px; }
+        .excel-container { background-color: white; border: 2px solid #217346; border-radius: 5px; max-width: 950px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .excel-header { background-color: #217346; color: white; padding: 12px; font-weight: bold; text-align: center; font-size: 1.3em; }
+        
+        table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+        th, td { border: 1px solid #d4d4d4; padding: 10px; text-align: center; font-size: 14px; }
+        th { background-color: #e6e6e6; color: #333; }
+        
+        .col-header { background-color: #f9f9f9; font-weight: bold; width: 18%; }
+        input[type="number"] { width: 85%; padding: 6px; border: 1px solid #aaa; border-radius: 3px; text-align: center; font-size: 15px; }
+        input:focus { border-color: #217346; background-color: #f0fff4; outline: none; }
+        
+        /* 강조 스타일 */
+        .subtotal-kg { color: #1976d2; font-weight: bold; }
+        .subtotal-lbs { color: #7b1fa2; }
+        .fuel-input { background-color: #fff3e0; border: 2px solid #ff9800 !important; font-weight: bold; }
+        .bew-input { background-color: #e8f5e9; border: 2px solid #2e7d32 !important; font-weight: bold; }
+        
+        /* 중량 초과 경고 스타일 */
+        .total-row { background-color: #fff9c4; font-weight: bold; font-size: 1.2em; }
+        .weight-normal { color: black; }
+        .weight-over { color: #d32f2f; text-decoration: underline; }
+
+        /* 결과창 스타일 */
+        .result-section { padding: 20px; border-top: 2px solid #217346; background-color: #f8f9fa; }
+        .env-input { margin-bottom: 15px; text-align: center; font-size: 1.1em; }
+        .base-tq-info { text-align: center; font-size: 14px; color: #555; margin-bottom: 10px; }
+        .torque-container { display: flex; justify-content: space-around; gap: 20px; }
+        .torque-box { flex: 1; text-align: center; font-size: 22px; font-weight: bold; padding: 15px; border-radius: 8px; }
+        .ige-box { color: #0d47a1; background: #e3f2fd; border: 2px solid #1976d2; }
+        .oge-box { color: #b71c1c; background: #ffebee; border: 2px solid #d32f2f; }
+    </style>
+</head>
+<body>
+
+<div class="excel-container">
+    <div class="excel-header">Multi-Platform Mission Weight & Auto Performance</div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>항목</th>
+                <th>기준 (kg)</th>
+                <th>수량 / 입력</th>
+                <th>소계 (kg)</th>
+                <th>소계 (LBS)</th>
+                <th>비고</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="col-header">기본 자중(BEW)</td>
+                <td>1</td>
+                <td><input type="number" id="in_bew_kg" value="2889.2" class="bew-input" oninput="updateAll()"></td>
+                <td id="kg_ac" class="subtotal-kg">-</td>
+                <td id="lbs_ac" class="subtotal-lbs">-</td>
+                <td><b style="color:#2e7d32;">기종별 자중(kg)</b></td>
+            </tr>
+            <tr>
+                <td class="col-header">조종사</td>
+                <td>80</td>
+                <td><input type="number" id="q_pilot" value="2" oninput="updateAll()"></td>
+                <td id="kg_pilot" class="subtotal-kg">160</td>
+                <td id="lbs_pilot" class="subtotal-lbs">-</td>
+                <td>1인 80kg</td>
+            </tr>
+            <tr>
+                <td class="col-header">승무원/전탐사</td>
+                <td>80</td>
+                <td><input type="number" id="q_crew" value="1" oninput="updateAll()"></td>
+                <td id="kg_crew" class="subtotal-kg">80</td>
+                <td id="lbs_crew" class="subtotal-lbs">-</td>
+                <td>1인 80kg</td>
+            </tr>
+            <tr>
+                <td class="col-header">구조사</td>
+                <td>90</td>
+                <td><input type="number" id="q_rescu" value="0" oninput="updateAll()"></td>
+                <td id="kg_rescu" class="subtotal-kg">0</td>
+                <td id="lbs_rescu" class="subtotal-lbs">-</td>
+                <td>1인 90kg</td>
+            </tr>
+            <tr>
+                <td class="col-header">임무연료(Fuel)</td>
+                <td>-</td>
+                <td><input type="number" id="in_fuel_lbs" value="1500" class="fuel-input" oninput="updateAll()"></td>
+                <td id="kg_fuel" class="subtotal-kg">-</td>
+                <td id="lbs_fuel" class="subtotal-lbs" style="font-weight:bold;">-</td>
+                <td><b style="color:#e65100;">LBS 입력</b></td>
+            </tr>
+            <tr>
+                <td class="col-header">기타 장비</td>
+                <td>1</td>
+                <td><input type="number" id="in_etc_kg" value="26" oninput="updateAll()"></td>
+                <td id="kg_etc" class="subtotal-kg">26</td>
+                <td id="lbs_etc" class="subtotal-lbs">-</td>
+                <td>kg 입력</td>
+            </tr>
+            <tr class="total-row">
+                <td colspan="3">임무 총중량 (AGW)</td>
+                <td id="total_kg" class="weight-normal">- kg</td>
+                <td id="total_lbs" class="weight-normal">- LBS</td>
+                <td id="limit_msg" style="font-size: 0.8em;">Limit: 4300kg / 9800lbs</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="result-section">
+        <div class="env-input">
+            <label><strong>현재 기온 (°C): </strong></label>
+            <input type="number" id="air_temp" value="15" style="width: 100px;" oninput="updateAll()">
+        </div>
+        
+        <div class="base-tq-info" id="base_tq_display">
+            (기준: 10kt OGE TQ = -- %)
+        </div>
+
+        <div class="torque-container">
+            <div class="torque-box ige-box" id="out_ige">
+                0kt IGE: -- %
+            </div>
+            <div class="torque-box oge-box" id="out_oge">
+                0kt OGE: -- %
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const KG_TO_LBS = 2.20462262;
+    const LIMIT_KG = 4300;
+    const LIMIT_LBS = 9800;
+
+    // 기온 기준 배열
+    const temps = [-5, 10, 15, 20, 25, 30, 35];
+    
+    // 기준 데이터 (10kt OGE T/Q)
+    const perfData = [
+        { w: 4300, tq: [89.5, 90.75, 92.0, 92.7, 93.4, 94.1, 94.8] },
+        { w: 4200, tq: [86.5, 87.60, 88.7, 89.3, 89.9, 90.5, 91.1] },
+        { w: 4100, tq: [83.5, 84.50, 85.5, 86.0, 86.5, 87.0, 87.5] },
+        { w: 4000, tq: [80.5, 81.40, 82.3, 82.8, 83.3, 83.8, 84.3] }
+    ];
+
+    function calculateBaseTorque(weight, temp) {
+        let row = perfData.reduce((prev, curr) => 
+            Math.abs(curr.w - weight) < Math.abs(prev.w - weight) ? curr : prev
+        );
+
+        let resultTq = 0;
+        if (temp <= temps[0]) resultTq = row.tq[0];
+        else if (temp >= temps[temps.length-1]) resultTq = row.tq[temps.length-1];
+        else {
+            for (let i = 0; i < temps.length - 1; i++) {
+                if (temp >= temps[i] && temp <= temps[i+1]) {
+                    const q1 = row.tq[i], q2 = row.tq[i+1];
+                    const t1 = temps[i], t2 = temps[i+1];
+                    resultTq = q1 + (q2 - q1) * (temp - t1) / (t2 - t1);
+                    break;
+                }
+            }
+        }
+        return resultTq;
+    }
+
+    function updateAll() {
+        // 1. 중량 합산 로직
+        const bew_kg = parseFloat(document.getElementById('in_bew_kg').value) || 0;
+        const pilot_kg = (parseFloat(document.getElementById('q_pilot').value) || 0) * 80;
+        const crew_kg = (parseFloat(document.getElementById('q_crew').value) || 0) * 80;
+        const rescu_kg = (parseFloat(document.getElementById('q_rescu').value) || 0) * 90;
+        const fuel_lbs = parseFloat(document.getElementById('in_fuel_lbs').value) || 0;
+        const fuel_kg = fuel_lbs / KG_TO_LBS;
+        const etc_kg = parseFloat(document.getElementById('in_etc_kg').value) || 0;
+
+        document.getElementById('kg_ac').innerText = bew_kg.toFixed(1);
+        document.getElementById('kg_pilot').innerText = pilot_kg.toFixed(1);
+        document.getElementById('kg_crew').innerText = crew_kg.toFixed(1);
+        document.getElementById('kg_rescu').innerText = rescu_kg.toFixed(1);
+        document.getElementById('kg_fuel').innerText = fuel_kg.toFixed(1);
+        document.getElementById('kg_etc').innerText = etc_kg.toFixed(1);
+
+        document.getElementById('lbs_ac').innerText = (bew_kg * KG_TO_LBS).toFixed(1);
+        document.getElementById('lbs_pilot').innerText = (pilot_kg * KG_TO_LBS).toFixed(1);
+        document.getElementById('lbs_crew').innerText = (crew_kg * KG_TO_LBS).toFixed(1);
+        document.getElementById('lbs_rescu').innerText = (rescu_kg * KG_TO_LBS).toFixed(1);
+        document.getElementById('lbs_fuel').innerText = fuel_lbs.toFixed(0);
+        document.getElementById('lbs_etc').innerText = (etc_kg * KG_TO_LBS).toFixed(1);
+
+        const total_kg = bew_kg + pilot_kg + crew_kg + rescu_kg + fuel_kg + etc_kg;
+        const total_lbs = total_kg * KG_TO_LBS;
+
+        const elKg = document.getElementById('total_kg');
+        const elLbs = document.getElementById('total_lbs');
+        const elMsg = document.getElementById('limit_msg');
+
+        elKg.innerText = total_kg.toFixed(1) + " kg";
+        elLbs.innerText = total_lbs.toFixed(1) + " LBS";
+
+        if (total_kg >= LIMIT_KG || total_lbs >= LIMIT_LBS) {
+            elKg.className = 'weight-over';
+            elLbs.className = 'weight-over';
+            elMsg.innerHTML = "<b style='color:#d32f2f;'>OVERWEIGHT!</b>";
+        } else {
+            elKg.className = 'weight-normal';
+            elLbs.className = 'weight-normal';
+            elMsg.innerText = "Within Limits";
+        }
+
+        // 2. 토큐 산출 및 가감산 로직 (10kt OGE 기준)
+        const temp = parseFloat(document.getElementById('air_temp').value) || 15;
+        
+        // 기준 토큐 (10kt OGE) 계산
+        const baseTq = calculateBaseTorque(total_kg, temp);
+        
+        // 공식 적용: 0kt OGE = 기준 + 3 / 0kt IGE = 기준 - 3
+        const ogeResult = baseTq + 3;
+        const igeResult = baseTq - 3;
+
+        // 화면에 반영
+        document.getElementById('base_tq_display').innerText = `(표준 데이터 산출: 10kt OGE TQ = ${baseTq.toFixed(2)} %)`;
+        document.getElementById('out_oge').innerText = "0kt OGE: " + ogeResult.toFixed(2) + " %";
+        document.getElementById('out_ige').innerText = "0kt IGE: " + igeResult.toFixed(2) + " %";
+    }
+
+    // 웹페이지 열리자마자 최초 계산 실행
+    window.onload = updateAll;
+</script>
+
+</body>
+</html>
